@@ -245,7 +245,11 @@ func TestCacheDelete(t *testing.T) {
 	// Setup
 	c := New()
 	for i := range 10 {
-		c.Set(fmt.Sprintf("k%d", i+1), fmt.Sprintf("value%d", i+1))
+		if i%2 == 0 {
+			c.SetWithTtl(fmt.Sprintf("k%d", i+1), fmt.Sprintf("value%d", i+1), 100*time.Millisecond)
+		} else {
+			c.Set(fmt.Sprintf("k%d", i+1), fmt.Sprintf("value%d", i+1))
+		}
 	}
 
 	// Test Case 1: Delete single non-existing key

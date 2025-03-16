@@ -167,14 +167,6 @@ func (c *Cache) Get(key string) (any, error) {
 	}
 
 	if val.Expired() {
-		if c.deleteOnExpire {
-			if val.timer != nil {
-				val.timer.Stop()
-			}
-
-			delete(c.data, key)
-		}
-
 		return nil, ErrKeyNotFound
 	}
 
