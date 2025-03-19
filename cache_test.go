@@ -471,3 +471,108 @@ func TestCacheClear(t *testing.T) {
 		}
 	})
 }
+
+func TestCacheGetTtl(t *testing.T) {
+	// Setup
+	c := New()
+	c.Set("k1", "value1")
+	c.SetWithTtl("k2", "value3", 500*time.Millisecond)
+
+	if ttl := c.GetTtl("k1"); ttl != 0 {
+		t.Errorf("GetTtl of \"k1\" - got: %v, want: 0", ttl)
+	}
+
+	if ttl := c.GetTtl("k2"); ttl != 500*time.Millisecond {
+		t.Errorf("GetTtl of \"k2\" - got: %v, want: 500ms", ttl)
+	}
+
+	if ttl := c.GetTtl("nonexistent"); ttl != -1 {
+		t.Errorf("GetTtl of \"nonexistent\" - got: %v, want: -1", ttl)
+	}
+
+	time.Sleep(550 * time.Millisecond)
+
+	if ttl := c.GetTtl("k2"); ttl != -1 {
+		t.Errorf("GetTtl of \"k2\" after TTL - got: %v, want: -1", ttl)
+	}
+}
+
+func TestCacheChangeTtl(t *testing.T) {
+	// Setup
+	c := New()
+	c.Set("k1", "value1")
+	c.SetWithTtl("k2", "value2", 500*time.Millisecond)
+	c.Set("k3", "value3")
+	c.SetWithTtl("k4", "value4", 700*time.Millisecond)
+
+	// Test Case 1: Change TTL to -1
+	t.Run("ChangeTtl to -1", func(t *testing.T) {
+		if !c.ChangeTtl("k3", -1) {
+			t.Errorf("ChangeTtl of \"k3\" to -1 - got: false, want: true")
+		}
+	})
+
+	// Test Case 2: Change TTL from 0 to 200ms
+	t.Run("ChangeTtl from 0 to 200ms", func(t *testing.T) {
+		if !c.ChangeTtl("k1", 200*time.Millisecond) {
+			t.Errorf("ChangeTtl of \"k1\" to 200ms - got: false, want: true")
+		}
+
+		if ttl := c.GetTtl("k1"); ttl != 200*time.Millisecond {
+			t.Errorf("GetTtl of \"k1\" - got: %v, want: 200ms", ttl)
+		}
+
+		time.Sleep(250 * time.Millisecond)
+
+		if c.Has("k1") {
+			t.Errorf("\"k1\" still exists after new TTL")
+		}
+	})
+
+	// Test Case 3: Change TTL from 500ms to 300ms
+	t.Run("ChangeTtl from 500ms to 300ms", func(t *testing.T) {
+		if !c.ChangeTtl("k2", 300*time.Millisecond) {
+			t.Errorf("ChangeTtl of \"k2\" to 300ms - got: false, want: true")
+		}
+
+		if ttl := c.GetTtl("k2"); ttl != 300*time.Millisecond {
+			t.Errorf("GetTtl of \"k2\" - got: %v, want: 300ms", ttl)
+		}
+
+		time.Sleep(350 * time.Millisecond)
+
+		if c.Has("k2") {
+			t.Errorf("\"k2\" still exists after new TTL")
+		}
+	})
+
+	// Test Case 4: Change TTL from 700ms to 900ms
+	t.Run("ChangeTtl from 700ms to 900ms", func(t *testing.T) {
+		if !c.ChangeTtl("k4", 900*time.Millisecond) {
+			t.Errorf("ChangeTtl of \"k4\" to 700ms - got: false, want: true")
+		}
+
+		if ttl := c.GetTtl("k4"); ttl != 900*time.Millisecond {
+			t.Errorf("GetTtl of \"k4\" - got: %v, want: 700ms", ttl)
+		}
+
+		time.Sleep(550 * time.Millisecond)
+
+		if !c.Has("k4") {
+			t.Errorf("\"k4\" does not exist before new TTL")
+		}
+
+		time.Sleep(400 * time.Millisecond)
+
+		if c.Has("k4") {
+			t.Errorf("\"k4\" still exists after new TTL")
+		}
+	})
+
+	// Test Case 5: Change TTL of non existent
+	t.Run("ChangeTtl of non-existent", func(t *testing.T) {
+		if c.ChangeTtl("nonexistent", 200*time.Millisecond) {
+			t.Errorf("ChangeTtl of \"nonexistent\" to 200ms - got: true, want: false")
+		}
+	})
+}
