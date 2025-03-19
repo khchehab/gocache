@@ -245,6 +245,7 @@ func TestCacheDelete(t *testing.T) {
 	// Setup
 	c := New()
 	c.Set("k1", "value1")
+	c.SetWithTtl("k2", "value2", 300*time.Millisecond)
 
 	// Test Case 1: Delete non-existing key
 	t.Run("non-existing key", func(t *testing.T) {
@@ -258,6 +259,15 @@ func TestCacheDelete(t *testing.T) {
 	// Test Case 2: Delete existing key
 	t.Run("existing key", func(t *testing.T) {
 		count := c.Delete("k1")
+
+		if count != 1 {
+			t.Errorf("deleted count - got: %d, want 1", count)
+		}
+	})
+
+	// Test Case 3: Delete existing key with TTL
+	t.Run("existing key with ttl", func(t *testing.T) {
+		count := c.Delete("k2")
 
 		if count != 1 {
 			t.Errorf("deleted count - got: %d, want 1", count)

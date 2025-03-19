@@ -10,7 +10,7 @@ type Stats struct {
 	// Keys is the total number of keys currently stored in the cache.
 	Keys uint
 	// KeySize is the total size (in bytes) of all keys stored in the cache.
-	KeySize uint
+	KeySize uint64
 	// ValueSize is the total size (in bytes) of all values stored in the cache.
-	ValueSize uint
+	ValueSize uint64
 }

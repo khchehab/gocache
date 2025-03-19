@@ -326,6 +326,8 @@ func (c *Cache) GetTtl(key string) time.Duration {
 // Keys returns a slice of all keys currently stored in the cache.
 // It uses a mutex lock to ensure thread-safety.
 //
+// The keys returned are both active and expired (if not deleted).
+//
 // Returns:
 //   - []string: A slice containing all keys in the cache.
 func (c *Cache) Keys() []string {
@@ -347,8 +349,13 @@ func (c *Cache) Has(key string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	_, ok := c.data[key]
-	return ok
+	val, ok := c.data[key]
+
+	if !ok || val.Expired() {
+		return false
+	}
+
+	return true
 }
 
 // Stats returns a copy of the current cache statistics such as hits, misses, key count, the total key size and the total value size.

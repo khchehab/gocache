@@ -9,6 +9,6 @@ import "github.com/DmitriyVTitov/size"
 //
 // Returns:
 //   - uint: The size of the variable in bytes.
-func SizeOf(v any) uint {
-	return uint(size.Of(v))
+func SizeOf(v any) uint64 {
+	return uint64(size.Of(v))
 }
