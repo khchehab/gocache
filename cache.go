@@ -1,33 +1,11 @@
 package gocache
 
 import (
-	"log"
 	"maps"
 	"slices"
 	"sync"
 	"time"
 )
-
-// cacheValue is a structure that represents the cache value.
-// It contains the actual value, the TTL and the expiry date of the value.
-type cacheValue struct {
-	// value is the actual value of the cache entry.
-	value any
-	// ttl is the time-to-live duration of the cache value entry.
-	ttl time.Duration
-	// expiryDate is the cache entry value expiration date.
-	expiryDate time.Time
-	// timer is timer of the cache value if delete on expire is set on it.
-	timer *time.Timer
-}
-
-// Expired returns a flag whether the cache entry has expired or not.
-//
-// Returns:
-//   - bool: A flag if the cache entry has expired or not.
-func (v *cacheValue) Expired() bool {
-	return v.ttl > 0 && v.expiryDate.Before(time.Now().UTC())
-}
 
 // Cache is a thread-safe in-memory key-value store.
 type Cache struct {
@@ -42,8 +20,9 @@ type Cache struct {
 	// The value `-1` means unlimited.
 	maxKeys int
 
-	data map[string]*cacheValue
-	mu   sync.RWMutex
+	data  map[string]*cacheValue
+	mu    sync.Mutex
+	stats *Stats
 }
 
 // New creates and returns a new Cache instance with optional configuration and an empty data store.
@@ -61,6 +40,13 @@ func New(opts ...OptFunc) *Cache {
 		deleteOnExpire: true,
 		maxKeys:        -1,
 		data:           make(map[string]*cacheValue),
+		stats: &Stats{
+			Hits:      0,
+			Misses:    0,
+			Keys:      0,
+			KeySize:   0,
+			ValueSize: 0,
+		},
 	}
 
 	for _, fn := range opts {
@@ -99,16 +85,23 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 
 	val, ok := c.data[key]
 
-	if !ok && c.maxKeys != -1 && len(c.data) >= c.maxKeys {
+	if !ok && c.maxKeys != -1 && int(c.stats.Keys) >= c.maxKeys {
 		return ErrCacheFull
 	}
+
+	valueSize := SizeOf(value)
 
 	if ok {
 		if val.timer != nil {
 			val.timer.Stop()
 		}
 
+		c.stats.ValueSize -= val.size
 		delete(c.data, key)
+	} else {
+		c.stats.Keys++
+		c.stats.KeySize += SizeOf(key)
+		c.stats.ValueSize += valueSize
 	}
 
 	keyTtl := c.stdTtl
@@ -117,31 +110,29 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 	}
 
 	expiryDate := time.Now().UTC().Add(keyTtl)
-	c.data[key] = &cacheValue{
+	val = &cacheValue{
 		value:      value,
+		size:       valueSize,
 		ttl:        keyTtl,
 		expiryDate: expiryDate,
 		timer:      nil,
 	}
+	c.data[key] = val
 
 	if keyTtl > 0 && c.deleteOnExpire {
 		c.data[key].timer = time.AfterFunc(keyTtl, func() {
-			log.Println("set with ttl - deletion after func - start")
 			c.mu.Lock()
 			defer c.mu.Unlock()
 
-			log.Println("set with ttl - deletion after func - before obtained lock")
-
+			c.stats.Keys--
+			c.stats.KeySize -= SizeOf(key)
+			c.stats.ValueSize -= val.size
 			delete(c.data, key)
-
-			log.Println("set with ttl - deletion after func - deleted entry")
 		})
 	}
 
 	return nil
 }
-
-// TODO MSET (Multiple Set) (Array<(key, value, [ttl])>)
 
 // Get retrieves the value associated with the provided key from the cache in a thread-safe manner.
 // It uses a mutex lock to ensure thread-safety.
@@ -159,17 +150,19 @@ func (c *Cache) Get(key string) (any, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	var val *cacheValue
-	var ok bool
+	val, ok := c.data[key]
 
-	if val, ok = c.data[key]; !ok {
+	if !ok {
+		c.stats.Misses++
 		return nil, ErrKeyNotFound
 	}
 
 	if val.Expired() {
+		c.stats.Misses++
 		return nil, ErrKeyNotFound
 	}
 
+	c.stats.Hits++
 	return val.value, nil
 }
 
@@ -189,10 +182,15 @@ func (c *Cache) GetAndDelete(key string) (any, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	var val *cacheValue
-	var ok bool
+	val, ok := c.data[key]
 
-	if val, ok = c.data[key]; !ok {
+	if !ok {
+		c.stats.Misses++
+		return nil, ErrKeyNotFound
+	}
+
+	if val.Expired() {
+		c.stats.Misses++
 		return nil, ErrKeyNotFound
 	}
 
@@ -200,48 +198,130 @@ func (c *Cache) GetAndDelete(key string) (any, error) {
 		val.timer.Stop()
 	}
 
+	c.stats.Hits++
+	c.stats.Keys--
+	c.stats.KeySize -= SizeOf(key)
+	c.stats.ValueSize -= val.size
 	delete(c.data, key)
 
 	return val.value, nil
 }
 
-// Delete removes the specified key(s) from the cache if they exist.
+// Delete removes the specified key from the cache if it exists.
 // It uses a mutex lock to ensure thread-safety.
 //
-// The function never fails, it returns the number of key(s) that have been deleted.
+// The function never fails, it returns the number of key that have been deleted.
+// If the key was found and deleted, the function will return `1`, otherwise `0`.
 //
 // Parameters:
-//   - keys: A variadic list of strings for the keys to delete.
+//   - key: The key to delete from the cache.
 //
 // Returns:
 //   - int: The number of entries that have been deleted from the cache.
-func (c *Cache) Delete(keys ...string) int {
-	if len(keys) == 0 {
-		return 0
-	}
-
+func (c *Cache) Delete(key string) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	count := 0
 
-	for _, key := range keys {
-		if val, ok := c.data[key]; ok {
-			if val.timer != nil {
-				val.timer.Stop()
-			}
+	val, ok := c.data[key]
 
-			delete(c.data, key)
-			count++
-		}
+	if !ok {
+		return 0
 	}
+
+	if val.timer != nil {
+		val.timer.Stop()
+	}
+
+	c.stats.Keys--
+	c.stats.KeySize -= SizeOf(key)
+	c.stats.ValueSize -= val.size
+	delete(c.data, key)
+	count++
 
 	return count
 }
 
-// TODO TTL (Change TTL) ([key], ttl) (delete key if ttl < 0)
+// ChangeTtl changes the TTL of a key. The function returns whether the TTL has been changed or not.
+// It uses a mutex lock to ensure thread-safety.
+//
+// Below are the possible TTL values:
+//   - `-1` will delete the key.
+//   - `0` will make the key entry not expire.
+//   - Any other value will set the TTL for the key entry.
+//
+// Parameters:
+//   - key: The key to change the TTL of.
+//   - ttl: The TTL to update.
+//
+// Returns:
+//   - bool: A boolean flag whether the TTL of the key has been changed or not.
+func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-// TODO getTTL (Get TTL) ([key])
+	val, ok := c.data[key]
+
+	if !ok || val.Expired() {
+		return false
+	}
+
+	if val.timer != nil {
+		val.timer.Stop()
+	}
+
+	if ttl < 0 {
+		c.stats.Keys--
+		c.stats.KeySize -= SizeOf(key)
+		c.stats.ValueSize -= val.size
+		delete(c.data, key)
+		return true
+	}
+
+	val.ttl = ttl
+	val.expiryDate = time.Now().UTC().Add(ttl)
+
+	if ttl > 0 && c.deleteOnExpire {
+		val.timer = time.AfterFunc(ttl, func() {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+
+			c.stats.Keys--
+			c.stats.KeySize -= SizeOf(key)
+			c.stats.ValueSize -= val.size
+			delete(c.data, key)
+		})
+	}
+
+	return true
+}
+
+// GetTtl returns the TTL (time-to-live) for the specified key.
+// It uses a mutex lock to ensure thread-safety.
+//
+// Cases:
+//   - If the key does not exist, a value of `-1` is returned.
+//   - If the key exists and has no TTL, a value of `0` is returned.
+//   - If the key exists and has a TTL, the TTL value is returned.
+//
+// Parameters:
+//   - key: The key to get the TTL of.
+//
+// Returns:
+//   - time.Duration: The TTL of the key, `0` if no TTL, and `-1` if the key does not exist.
+func (c *Cache) GetTtl(key string) time.Duration {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	val, ok := c.data[key]
+
+	if !ok || val.Expired() {
+		return -1
+	}
+
+	return val.ttl
+}
 
 // Keys returns a slice of all keys currently stored in the cache.
 // It uses a mutex lock to ensure thread-safety.
@@ -249,8 +329,8 @@ func (c *Cache) Delete(keys ...string) int {
 // Returns:
 //   - []string: A slice containing all keys in the cache.
 func (c *Cache) Keys() []string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	return slices.Sorted(maps.Keys(c.data))
 }
@@ -264,22 +344,71 @@ func (c *Cache) Keys() []string {
 // Returns:
 //   - bool: A boolean flag that indicates the existence of the key in the cache.
 func (c *Cache) Has(key string) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	_, ok := c.data[key]
 	return ok
 }
 
-// TODO STATS ??
-// TODO FLUSH ??
-// TODO FLUSH STATS ??
-// TODO close cache ??
+// Stats returns a copy of the current cache statistics such as hits, misses, key count, the total key size and the total value size.
+//
+// Returns:
+//   - Stats: A copy of the cache statistics.
+func (c *Cache) Stats() Stats {
+	return *c.stats
+}
 
-// TODO event emitters ??? does it work in go?
-// events:
-// * set
-// * del
-// * expired
-// * flush
-// * flush_stats
+// Clear removes all key-value entries from the cache and resets statistics.
+//
+// This function safely clears the entire cache by:
+//   - Stopping any active timers associated with expiring keys.
+//   - Deleting all entries from the cache.
+//   - Resetting cache statistics to zero.
+//
+// It uses a mutex lock to ensure thread-safety.
+//
+// Usage:
+//   - Call this function to completely reset the cache, removing all stored data.
+func (c *Cache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for k, v := range c.data {
+		if v.timer != nil {
+			v.timer.Stop()
+		}
+
+		delete(c.data, k)
+	}
+
+	c.stats = &Stats{
+		Hits:      0,
+		Misses:    0,
+		Keys:      0,
+		KeySize:   0,
+		ValueSize: 0,
+	}
+}
+
+// ClearStats resets all cache statistics to zero in a thread-safe manner.
+//
+// This function clears the stored statistics, including hits, misses, key count,
+// key size, and value size. It does not affect the actual cached data.
+//
+// It uses a mutex lock to ensure thread-safety.
+//
+// Usage:
+//   - Call this function to reset cache statistics, e.g., after a performance measurement.
+func (c *Cache) ClearStats() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.stats = &Stats{
+		Hits:      0,
+		Misses:    0,
+		Keys:      0,
+		KeySize:   0,
+		ValueSize: 0,
+	}
+}
