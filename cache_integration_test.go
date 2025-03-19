@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestCacheIntegrationSequential(t *testing.T) {
+func TestCacheIntegration(t *testing.T) {
 	c := New(
 		WithStdTtl(500*time.Millisecond),
 		WithMaxKeys(3),
