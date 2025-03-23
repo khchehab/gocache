@@ -3,9 +3,12 @@ package gocache
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 )
+
+const keyPoolSize = 1024
 
 func TestCacheSet(t *testing.T) {
 	// Setup
@@ -447,4 +450,174 @@ func TestCacheChangeTtl(t *testing.T) {
 			t.Errorf("ChangeTtl of \"nonexistent\" to 200ms - got: true, want: false")
 		}
 	})
+}
+
+func BenchmarkCacheSet(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	values := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+		values[i] = fmt.Sprintf("value%d", i)
+	}
+
+	b.ResetTimer()
+
+	for i := range b.N {
+		c.Set(keys[i%keyPoolSize], values[i%keyPoolSize])
+	}
+}
+
+func BenchmarkCacheSetWithTtl(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	values := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+		values[i] = fmt.Sprintf("value%d", i)
+	}
+
+	b.ResetTimer()
+
+	for i := range b.N {
+		c.SetWithTtl(keys[i%keyPoolSize], values[i%keyPoolSize], 100*time.Millisecond)
+	}
+}
+
+func BenchmarkCacheGet(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+		c.Set(keys[i], fmt.Sprintf("value%d", i))
+	}
+
+	b.ResetTimer()
+
+	for i := range b.N {
+		c.Get(keys[i%keyPoolSize])
+	}
+}
+
+func BenchmarkCacheGetAndDelete(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+		c.Set(keys[i], fmt.Sprintf("value%d", i))
+	}
+
+	b.ResetTimer()
+
+	for i := range b.N {
+		c.GetAndDelete(keys[i%keyPoolSize])
+	}
+}
+
+func BenchmarkCacheDelete(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+		c.Set(keys[i], fmt.Sprintf("value%d", i))
+	}
+
+	b.ResetTimer()
+
+	for i := range b.N {
+		c.Delete(keys[i%keyPoolSize])
+	}
+}
+
+func BenchmarkCacheKeys(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+	}
+
+	b.ResetTimer()
+
+	for range b.N {
+		c.Keys()
+	}
+}
+
+func BenchmarkCacheHas(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+		c.Set(keys[i], fmt.Sprintf("value%d", i))
+	}
+
+	b.ResetTimer()
+
+	for i := range b.N {
+		c.Has(keys[i%keyPoolSize])
+	}
+}
+
+func BenchmarkCacheClear(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	values := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+		values[i] = fmt.Sprintf("value%d", i)
+	}
+
+	b.ResetTimer()
+
+	for range b.N {
+		b.StopTimer()
+
+		for i := range keyPoolSize {
+			c.Set(keys[i], values[i])
+		}
+
+		b.StartTimer()
+
+		c.Clear()
+	}
+}
+
+func BenchmarkCacheGetTtl(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+		c.Set(keys[i], fmt.Sprintf("value%d", i))
+	}
+
+	b.ResetTimer()
+
+	for i := range b.N {
+		c.GetTtl(keys[i%keyPoolSize])
+	}
+}
+
+func BenchmarkCacheChangeTtl(b *testing.B) {
+	c := New()
+
+	keys := make([]string, keyPoolSize)
+	for i := range keyPoolSize {
+		keys[i] = strconv.Itoa(i)
+		c.Set(keys[i], fmt.Sprintf("value%d", i))
+	}
+
+	b.ResetTimer()
+
+	for i := range b.N {
+		c.ChangeTtl(keys[i%keyPoolSize], 100*time.Millisecond)
+	}
 }

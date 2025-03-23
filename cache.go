@@ -1,8 +1,6 @@
 package gocache
 
 import (
-	"maps"
-	"slices"
 	"time"
 )
 
@@ -261,7 +259,13 @@ func (c *Cache) GetTtl(key string) time.Duration {
 // Returns:
 //   - []string: A slice containing all keys in the cache.
 func (c *Cache) Keys() []string {
-	return slices.Sorted(maps.Keys(c.data))
+	keys := make([]string, 0, len(c.data))
+
+	for k := range c.data {
+		keys = append(keys, k)
+	}
+
+	return keys
 }
 
 // Has checks whether the provided key exists in the cache.
@@ -290,11 +294,11 @@ func (c *Cache) Has(key string) bool {
 // Usage:
 //   - Call this function to completely reset the cache, removing all stored data.
 func (c *Cache) Clear() {
-	for k, v := range c.data {
+	for _, v := range c.data {
 		if v.timer != nil {
 			v.timer.Stop()
 		}
-
-		delete(c.data, k)
 	}
+
+	c.data = make(map[string]*cacheValue)
 }
