@@ -294,6 +294,10 @@ func (c *Cache) Has(key string) bool {
 // Usage:
 //   - Call this function to completely reset the cache, removing all stored data.
 func (c *Cache) Clear() {
+	if len(c.data) == 0 {
+		return
+	}
+
 	for _, v := range c.data {
 		if v.timer != nil {
 			v.timer.Stop()
