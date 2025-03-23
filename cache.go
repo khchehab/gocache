@@ -20,9 +20,8 @@ type Cache struct {
 	// The value `-1` means unlimited.
 	maxKeys int
 
-	data  map[string]*cacheValue
-	mu    sync.Mutex
-	stats *Stats
+	data map[string]*cacheValue
+	mu   sync.RWMutex
 }
 
 // New creates and returns a new Cache instance with optional configuration and an empty data store.
@@ -40,13 +39,6 @@ func New(opts ...OptFunc) *Cache {
 		deleteOnExpire: true,
 		maxKeys:        -1,
 		data:           make(map[string]*cacheValue),
-		stats: &Stats{
-			Hits:      0,
-			Misses:    0,
-			Keys:      0,
-			KeySize:   0,
-			ValueSize: 0,
-		},
 	}
 
 	for _, fn := range opts {
@@ -85,7 +77,7 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 
 	val, ok := c.data[key]
 
-	if !ok && c.maxKeys != -1 && int(c.stats.Keys) >= c.maxKeys {
+	if !ok && c.maxKeys != -1 && len(c.data) >= c.maxKeys {
 		return ErrCacheFull
 	}
 
@@ -96,12 +88,7 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 			val.timer.Stop()
 		}
 
-		c.stats.ValueSize -= val.size
 		delete(c.data, key)
-	} else {
-		c.stats.Keys++
-		c.stats.KeySize += SizeOf(key)
-		c.stats.ValueSize += valueSize
 	}
 
 	keyTtl := c.stdTtl
@@ -124,9 +111,6 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 			c.mu.Lock()
 			defer c.mu.Unlock()
 
-			c.stats.Keys--
-			c.stats.KeySize -= SizeOf(key)
-			c.stats.ValueSize -= val.size
 			delete(c.data, key)
 		})
 	}
@@ -147,22 +131,19 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 //   - any: The value stored in the cache for the provided key.
 //   - error: `ErrKeyNotFound` if the key does not exist.
 func (c *Cache) Get(key string) (any, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	val, ok := c.data[key]
 
 	if !ok {
-		c.stats.Misses++
 		return nil, ErrKeyNotFound
 	}
 
 	if val.Expired() {
-		c.stats.Misses++
 		return nil, ErrKeyNotFound
 	}
 
-	c.stats.Hits++
 	return val.value, nil
 }
 
@@ -185,12 +166,10 @@ func (c *Cache) GetAndDelete(key string) (any, error) {
 	val, ok := c.data[key]
 
 	if !ok {
-		c.stats.Misses++
 		return nil, ErrKeyNotFound
 	}
 
 	if val.Expired() {
-		c.stats.Misses++
 		return nil, ErrKeyNotFound
 	}
 
@@ -198,10 +177,6 @@ func (c *Cache) GetAndDelete(key string) (any, error) {
 		val.timer.Stop()
 	}
 
-	c.stats.Hits++
-	c.stats.Keys--
-	c.stats.KeySize -= SizeOf(key)
-	c.stats.ValueSize -= val.size
 	delete(c.data, key)
 
 	return val.value, nil
@@ -234,9 +209,6 @@ func (c *Cache) Delete(key string) int {
 		val.timer.Stop()
 	}
 
-	c.stats.Keys--
-	c.stats.KeySize -= SizeOf(key)
-	c.stats.ValueSize -= val.size
 	delete(c.data, key)
 	count++
 
@@ -272,10 +244,8 @@ func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
 	}
 
 	if ttl < 0 {
-		c.stats.Keys--
-		c.stats.KeySize -= SizeOf(key)
-		c.stats.ValueSize -= val.size
 		delete(c.data, key)
+
 		return true
 	}
 
@@ -287,9 +257,6 @@ func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
 			c.mu.Lock()
 			defer c.mu.Unlock()
 
-			c.stats.Keys--
-			c.stats.KeySize -= SizeOf(key)
-			c.stats.ValueSize -= val.size
 			delete(c.data, key)
 		})
 	}
@@ -311,8 +278,8 @@ func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
 // Returns:
 //   - time.Duration: The TTL of the key, `0` if no TTL, and `-1` if the key does not exist.
 func (c *Cache) GetTtl(key string) time.Duration {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	val, ok := c.data[key]
 
@@ -331,8 +298,8 @@ func (c *Cache) GetTtl(key string) time.Duration {
 // Returns:
 //   - []string: A slice containing all keys in the cache.
 func (c *Cache) Keys() []string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	return slices.Sorted(maps.Keys(c.data))
 }
@@ -346,8 +313,8 @@ func (c *Cache) Keys() []string {
 // Returns:
 //   - bool: A boolean flag that indicates the existence of the key in the cache.
 func (c *Cache) Has(key string) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	val, ok := c.data[key]
 
@@ -358,20 +325,11 @@ func (c *Cache) Has(key string) bool {
 	return true
 }
 
-// Stats returns a copy of the current cache statistics such as hits, misses, key count, the total key size and the total value size.
-//
-// Returns:
-//   - Stats: A copy of the cache statistics.
-func (c *Cache) Stats() Stats {
-	return *c.stats
-}
-
-// Clear removes all key-value entries from the cache and resets statistics.
+// Clear removes all key-value entries from the cache.
 //
 // This function safely clears the entire cache by:
 //   - Stopping any active timers associated with expiring keys.
 //   - Deleting all entries from the cache.
-//   - Resetting cache statistics to zero.
 //
 // It uses a mutex lock to ensure thread-safety.
 //
@@ -387,35 +345,5 @@ func (c *Cache) Clear() {
 		}
 
 		delete(c.data, k)
-	}
-
-	c.stats = &Stats{
-		Hits:      0,
-		Misses:    0,
-		Keys:      0,
-		KeySize:   0,
-		ValueSize: 0,
-	}
-}
-
-// ClearStats resets all cache statistics to zero in a thread-safe manner.
-//
-// This function clears the stored statistics, including hits, misses, key count,
-// key size, and value size. It does not affect the actual cached data.
-//
-// It uses a mutex lock to ensure thread-safety.
-//
-// Usage:
-//   - Call this function to reset cache statistics, e.g., after a performance measurement.
-func (c *Cache) ClearStats() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.stats = &Stats{
-		Hits:      0,
-		Misses:    0,
-		Keys:      0,
-		KeySize:   0,
-		ValueSize: 0,
 	}
 }

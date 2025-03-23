@@ -70,58 +70,8 @@ func TestCacheIntegration(t *testing.T) {
 		t.Errorf("Get nonexistent: val - got: %v, want: ErrKeyNotFound", err)
 	}
 
-	// Check stats
-	s := c.Stats()
-
-	if s.Hits != 3 {
-		t.Errorf("Stats Hits - got: %v, want: 3", s.Hits)
-	}
-
-	if s.Misses != 1 {
-		t.Errorf("Stats Misses - got: %v, want: 1", s.Misses)
-	}
-
-	if s.Keys != 3 {
-		t.Errorf("Stats Keys - got: %v, want: 3", s.Keys)
-	}
-
-	keySize := SizeOf("k1") + SizeOf("k2") + SizeOf("k3")
-	valueSize := SizeOf("value1") + SizeOf("value2") + SizeOf("value3")
-
-	if s.KeySize != keySize {
-		t.Errorf("Stats KeySize - got: %v, want: %v", s.KeySize, keySize)
-	}
-
-	if s.ValueSize != valueSize {
-		t.Errorf("Stats ValueSize - got: %v, want: %v", s.ValueSize, valueSize)
-	}
-
 	// Sleep for some time, before all entries expire
 	time.Sleep(350 * time.Millisecond)
-
-	// Clear stats
-	c.ClearStats()
-	s = c.Stats()
-
-	if s.Hits != 0 {
-		t.Errorf("Stats Hits - got: %v, want: 0", s.Hits)
-	}
-
-	if s.Misses != 0 {
-		t.Errorf("Stats Misses - got: %v, want: 0", s.Misses)
-	}
-
-	if s.Keys != 0 {
-		t.Errorf("Stats Keys - got: %v, want: 0", s.Keys)
-	}
-
-	if s.KeySize != 0 {
-		t.Errorf("Stats KeySize - got: %v, want: 0", s.KeySize)
-	}
-
-	if s.ValueSize != 0 {
-		t.Errorf("Stats ValueSize - got: %v, want: 0", s.ValueSize)
-	}
 
 	// Get values
 	value, err = c.Get("k1")
@@ -211,29 +161,6 @@ func TestCacheIntegration(t *testing.T) {
 
 	if !c.Has("k3") {
 		t.Error("Has k3 - got: false, want: true")
-	}
-
-	// Check stats again
-	s = c.Stats()
-
-	if s.Hits != 3 {
-		t.Errorf("Stats Hits - got: %v, want: 3", s.Hits)
-	}
-
-	if s.Misses != 3 {
-		t.Errorf("Stats Misses - got: %v, want: 3", s.Misses)
-	}
-
-	if s.Keys != 0 {
-		t.Errorf("Stats Keys - got: %v, want: 0", s.Keys)
-	}
-
-	if s.KeySize != 0 {
-		t.Errorf("Stats KeySize - got: %v, want: 0", s.KeySize)
-	}
-
-	if s.ValueSize != 0 {
-		t.Errorf("Stats ValueSize - got: %v, want: 0", s.ValueSize)
 	}
 
 	// Delete an entry

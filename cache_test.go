@@ -322,96 +322,6 @@ func TestCacheHas(t *testing.T) {
 	})
 }
 
-func TestCacheStats(t *testing.T) {
-	// Setup
-	c := New()
-	c.Set("k1", "value1")
-	c.Get("k2")
-	c.Get("k1")
-	c.SetWithTtl("k2", "value2", 500*time.Millisecond)
-	c.Get("k2")
-
-	t.Run("before key TTL", func(t *testing.T) {
-		s := c.Stats()
-
-		if s.Hits != 2 {
-			t.Errorf("Stats Hits - got: %d, want: 2", s.Hits)
-		}
-
-		if s.Misses != 1 {
-			t.Errorf("Stats Misses - got: %d, want: 1", s.Misses)
-		}
-
-		if s.Keys != 2 {
-			t.Errorf("Stats Keys - got: %d, want: 2", s.Keys)
-		}
-
-		keySize := SizeOf("k1") + SizeOf("k2")
-		valueSize := SizeOf("value1") + SizeOf("value2")
-
-		if s.KeySize != keySize {
-			t.Errorf("Stats Key Size - got: %d, want: %d", s.KeySize, keySize)
-		}
-
-		if s.ValueSize != valueSize {
-			t.Errorf("Stats Value Size - got: %d, want: %d", s.ValueSize, valueSize)
-		}
-	})
-
-	t.Run("after key TTL", func(t *testing.T) {
-		time.Sleep(550 * time.Millisecond)
-		s := c.Stats()
-
-		if s.Hits != 2 {
-			t.Errorf("Stats Hits - got: %d, want: 2", s.Hits)
-		}
-
-		if s.Misses != 1 {
-			t.Errorf("Stats Misses - got: %d, want: 1", s.Misses)
-		}
-
-		if s.Keys != 1 {
-			t.Errorf("Stats Keys - got: %d, want: 1", s.Keys)
-		}
-
-		keySize := SizeOf("k1")
-		valueSize := SizeOf("value1")
-
-		if s.KeySize != keySize {
-			t.Errorf("Stats Key Size - got: %d, want: %d", s.KeySize, keySize)
-		}
-
-		if s.ValueSize != valueSize {
-			t.Errorf("Stats Value Size - got: %d, want: %d", s.ValueSize, valueSize)
-		}
-	})
-
-	t.Run("clear stats", func(t *testing.T) {
-		c.ClearStats()
-		s := c.Stats()
-
-		if s.Hits != 0 {
-			t.Errorf("Stats Hits - got: %d, want: 0", s.Hits)
-		}
-
-		if s.Misses != 0 {
-			t.Errorf("Stats Misses - got: %d, want: 0", s.Misses)
-		}
-
-		if s.Keys != 0 {
-			t.Errorf("Stats Keys - got: %d, want: 0", s.Keys)
-		}
-
-		if s.KeySize != 0 {
-			t.Errorf("Stats Key Size - got: %d, want: 0", s.KeySize)
-		}
-
-		if s.ValueSize != 0 {
-			t.Errorf("Stats Value Size - got: %d, want: 0", s.ValueSize)
-		}
-	})
-}
-
 func TestCacheClear(t *testing.T) {
 	// Setup
 	c := New()
@@ -421,56 +331,8 @@ func TestCacheClear(t *testing.T) {
 	c.SetWithTtl("k2", "value2", 500*time.Millisecond)
 	c.Get("k2")
 
-	t.Run("statistics before clearing", func(t *testing.T) {
-		s := c.Stats()
-
-		if s.Hits != 2 {
-			t.Errorf("Stats Hits - got: %d, want: 2", s.Hits)
-		}
-
-		if s.Misses != 1 {
-			t.Errorf("Stats Misses - got: %d, want: 1", s.Misses)
-		}
-
-		if s.Keys != 2 {
-			t.Errorf("Stats Keys - got: %d, want: 2", s.Keys)
-		}
-
-		keySize := SizeOf("k1") + SizeOf("k2")
-		valueSize := SizeOf("value1") + SizeOf("value2")
-
-		if s.KeySize != keySize {
-			t.Errorf("Stats Key Size - got: %d, want: %d", s.KeySize, keySize)
-		}
-
-		if s.ValueSize != valueSize {
-			t.Errorf("Stats Value Size - got: %d, want: %d", s.ValueSize, valueSize)
-		}
-	})
-
 	t.Run("clear cache", func(t *testing.T) {
 		c.Clear()
-		s := c.Stats()
-
-		if s.Hits != 0 {
-			t.Errorf("Stats Hits - got: %d, want: 0", s.Hits)
-		}
-
-		if s.Misses != 0 {
-			t.Errorf("Stats Misses - got: %d, want: 0", s.Misses)
-		}
-
-		if s.Keys != 0 {
-			t.Errorf("Stats Keys - got: %d, want: 0", s.Keys)
-		}
-
-		if s.KeySize != 0 {
-			t.Errorf("Stats Key Size - got: %d, want: 0", s.KeySize)
-		}
-
-		if s.ValueSize != 0 {
-			t.Errorf("Stats Value Size - got: %d, want: 0", s.ValueSize)
-		}
 
 		if c.Has("k1") {
 			t.Error("Has \"k1\" - got: true, want: false")
