@@ -3,11 +3,10 @@ package gocache
 import (
 	"maps"
 	"slices"
-	"sync"
 	"time"
 )
 
-// Cache is a thread-safe in-memory key-value store.
+// Cache is an in-memory key-value store.
 type Cache struct {
 	// StdTtl defines the time-to-live for all the cache entries.
 	// The value `0` means unlimited.
@@ -21,7 +20,6 @@ type Cache struct {
 	maxKeys int
 
 	data map[string]*cacheValue
-	mu   sync.RWMutex
 }
 
 // New creates and returns a new Cache instance with optional configuration and an empty data store.
@@ -49,7 +47,6 @@ func New(opts ...OptFunc) *Cache {
 }
 
 // Set inserts or updates a key-value pair in the cache.
-// It uses a mutex lock to ensure thread-safety.
 //
 // Parameters:
 //   - key: The key to store the value under.
@@ -62,7 +59,6 @@ func (c *Cache) Set(key string, value any) error {
 }
 
 // SetWithTtl inserts or updates a key-value pair in the cache with the provided TTL for that entry.
-// It uses a mutex lock to ensure thread-safety.
 //
 // Parameters:
 //   - key: The key to store the value under.
@@ -72,16 +68,11 @@ func (c *Cache) Set(key string, value any) error {
 // Returns:
 //   - error: `ErrCacheFull` if the cache has reached the maximum number of keys allowed, otherwise `nil`.
 func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	val, ok := c.data[key]
 
 	if !ok && c.maxKeys != -1 && len(c.data) >= c.maxKeys {
 		return ErrCacheFull
 	}
-
-	valueSize := SizeOf(value)
 
 	if ok {
 		if val.timer != nil {
@@ -99,7 +90,6 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 	expiryDate := time.Now().UTC().Add(keyTtl)
 	val = &cacheValue{
 		value:      value,
-		size:       valueSize,
 		ttl:        keyTtl,
 		expiryDate: expiryDate,
 		timer:      nil,
@@ -108,9 +98,6 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 
 	if keyTtl > 0 && c.deleteOnExpire {
 		c.data[key].timer = time.AfterFunc(keyTtl, func() {
-			c.mu.Lock()
-			defer c.mu.Unlock()
-
 			delete(c.data, key)
 		})
 	}
@@ -118,8 +105,7 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 	return nil
 }
 
-// Get retrieves the value associated with the provided key from the cache in a thread-safe manner.
-// It uses a mutex lock to ensure thread-safety.
+// Get retrieves the value associated with the provided key from the cache.
 //
 // If the key exists, it returns the value and a nil error.
 // If the key is not found, it return nil and ErrKeyNotFound.
@@ -131,9 +117,6 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 //   - any: The value stored in the cache for the provided key.
 //   - error: `ErrKeyNotFound` if the key does not exist.
 func (c *Cache) Get(key string) (any, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	val, ok := c.data[key]
 
 	if !ok {
@@ -148,7 +131,6 @@ func (c *Cache) Get(key string) (any, error) {
 }
 
 // GetAndDelete retrieves the value associated with the provided key from the cache and removes it.
-// It uses a mutex lock to ensure thread-safety.
 //
 // If the key exists, it returns the value and deletes the entry from the cache.
 // If the key is not found, it return nil and ErrKeyNotFound.
@@ -160,9 +142,6 @@ func (c *Cache) Get(key string) (any, error) {
 //   - any: The value stored in the cache for the given key before deletion.
 //   - error: `ErrKeyNotFound` if the key does not exist.
 func (c *Cache) GetAndDelete(key string) (any, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	val, ok := c.data[key]
 
 	if !ok {
@@ -183,7 +162,6 @@ func (c *Cache) GetAndDelete(key string) (any, error) {
 }
 
 // Delete removes the specified key from the cache if it exists.
-// It uses a mutex lock to ensure thread-safety.
 //
 // The function never fails, it returns the number of key that have been deleted.
 // If the key was found and deleted, the function will return `1`, otherwise `0`.
@@ -194,9 +172,6 @@ func (c *Cache) GetAndDelete(key string) (any, error) {
 // Returns:
 //   - int: The number of entries that have been deleted from the cache.
 func (c *Cache) Delete(key string) int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	count := 0
 
 	val, ok := c.data[key]
@@ -216,7 +191,6 @@ func (c *Cache) Delete(key string) int {
 }
 
 // ChangeTtl changes the TTL of a key. The function returns whether the TTL has been changed or not.
-// It uses a mutex lock to ensure thread-safety.
 //
 // Below are the possible TTL values:
 //   - `-1` will delete the key.
@@ -230,9 +204,6 @@ func (c *Cache) Delete(key string) int {
 // Returns:
 //   - bool: A boolean flag whether the TTL of the key has been changed or not.
 func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	val, ok := c.data[key]
 
 	if !ok || val.Expired() {
@@ -254,9 +225,6 @@ func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
 
 	if ttl > 0 && c.deleteOnExpire {
 		val.timer = time.AfterFunc(ttl, func() {
-			c.mu.Lock()
-			defer c.mu.Unlock()
-
 			delete(c.data, key)
 		})
 	}
@@ -265,7 +233,6 @@ func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
 }
 
 // GetTtl returns the TTL (time-to-live) for the specified key.
-// It uses a mutex lock to ensure thread-safety.
 //
 // Cases:
 //   - If the key does not exist, a value of `-1` is returned.
@@ -278,9 +245,6 @@ func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
 // Returns:
 //   - time.Duration: The TTL of the key, `0` if no TTL, and `-1` if the key does not exist.
 func (c *Cache) GetTtl(key string) time.Duration {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	val, ok := c.data[key]
 
 	if !ok || val.Expired() {
@@ -291,21 +255,16 @@ func (c *Cache) GetTtl(key string) time.Duration {
 }
 
 // Keys returns a slice of all keys currently stored in the cache.
-// It uses a mutex lock to ensure thread-safety.
 //
 // The keys returned are both active and expired (if not deleted).
 //
 // Returns:
 //   - []string: A slice containing all keys in the cache.
 func (c *Cache) Keys() []string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	return slices.Sorted(maps.Keys(c.data))
 }
 
 // Has checks whether the provided key exists in the cache.
-// It uses a mutex lock to ensure thread-safety.
 //
 // Parameters:
 //   - key: The key to check its existence.
@@ -313,9 +272,6 @@ func (c *Cache) Keys() []string {
 // Returns:
 //   - bool: A boolean flag that indicates the existence of the key in the cache.
 func (c *Cache) Has(key string) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	val, ok := c.data[key]
 
 	if !ok || val.Expired() {
@@ -331,14 +287,9 @@ func (c *Cache) Has(key string) bool {
 //   - Stopping any active timers associated with expiring keys.
 //   - Deleting all entries from the cache.
 //
-// It uses a mutex lock to ensure thread-safety.
-//
 // Usage:
 //   - Call this function to completely reset the cache, removing all stored data.
 func (c *Cache) Clear() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	for k, v := range c.data {
 		if v.timer != nil {
 			v.timer.Stop()

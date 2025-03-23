@@ -7,8 +7,6 @@ import "time"
 type cacheValue struct {
 	// value is the actual value of the cache entry.
 	value any
-	// size is the size of the value in bytes.
-	size uint64
 	// ttl is the time-to-live duration of the cache value entry.
 	ttl time.Duration
 	// expiryDate is the cache entry value expiration date.
