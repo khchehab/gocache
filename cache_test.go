@@ -293,7 +293,7 @@ func TestCacheKeys(t *testing.T) {
 
 	// Test Case 2: Existing keys
 	t.Run("existing keys", func(t *testing.T) {
-		for i := range 3 {
+		for i := 0; i < 3; i++ {
 			c.Set(fmt.Sprintf("k%d", i+1), fmt.Sprintf("value%d", i+1))
 		}
 
@@ -457,14 +457,14 @@ func BenchmarkCacheSet(b *testing.B) {
 
 	keys := make([]string, keyPoolSize)
 	values := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 		values[i] = fmt.Sprintf("value%d", i)
 	}
 
 	b.ResetTimer()
 
-	for i := range b.N {
+	for i := 0; i < b.N; i++ {
 		c.Set(keys[i%keyPoolSize], values[i%keyPoolSize])
 	}
 }
@@ -474,14 +474,14 @@ func BenchmarkCacheSetWithTtl(b *testing.B) {
 
 	keys := make([]string, keyPoolSize)
 	values := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 		values[i] = fmt.Sprintf("value%d", i)
 	}
 
 	b.ResetTimer()
 
-	for i := range b.N {
+	for i := 0; i < b.N; i++ {
 		c.SetWithTtl(keys[i%keyPoolSize], values[i%keyPoolSize], 100*time.Millisecond)
 	}
 }
@@ -490,14 +490,14 @@ func BenchmarkCacheGet(b *testing.B) {
 	c := New()
 
 	keys := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 		c.Set(keys[i], fmt.Sprintf("value%d", i))
 	}
 
 	b.ResetTimer()
 
-	for i := range b.N {
+	for i := 0; i < b.N; i++ {
 		c.Get(keys[i%keyPoolSize])
 	}
 }
@@ -506,14 +506,14 @@ func BenchmarkCacheGetAndDelete(b *testing.B) {
 	c := New()
 
 	keys := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 		c.Set(keys[i], fmt.Sprintf("value%d", i))
 	}
 
 	b.ResetTimer()
 
-	for i := range b.N {
+	for i := 0; i < b.N; i++ {
 		c.GetAndDelete(keys[i%keyPoolSize])
 	}
 }
@@ -522,14 +522,14 @@ func BenchmarkCacheDelete(b *testing.B) {
 	c := New()
 
 	keys := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 		c.Set(keys[i], fmt.Sprintf("value%d", i))
 	}
 
 	b.ResetTimer()
 
-	for i := range b.N {
+	for i := 0; i < b.N; i++ {
 		c.Delete(keys[i%keyPoolSize])
 	}
 }
@@ -538,13 +538,13 @@ func BenchmarkCacheKeys(b *testing.B) {
 	c := New()
 
 	keys := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 	}
 
 	b.ResetTimer()
 
-	for range b.N {
+	for i := 0; i < b.N; i++ {
 		c.Keys()
 	}
 }
@@ -553,14 +553,14 @@ func BenchmarkCacheHas(b *testing.B) {
 	c := New()
 
 	keys := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 		c.Set(keys[i], fmt.Sprintf("value%d", i))
 	}
 
 	b.ResetTimer()
 
-	for i := range b.N {
+	for i := 0; i < b.N; i++ {
 		c.Has(keys[i%keyPoolSize])
 	}
 }
@@ -570,17 +570,17 @@ func BenchmarkCacheClear(b *testing.B) {
 
 	keys := make([]string, keyPoolSize)
 	values := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 		values[i] = fmt.Sprintf("value%d", i)
 	}
 
 	b.ResetTimer()
 
-	for range b.N {
+	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 
-		for i := range keyPoolSize {
+		for i := 0; i < keyPoolSize; i++ {
 			c.Set(keys[i], values[i])
 		}
 
@@ -594,14 +594,14 @@ func BenchmarkCacheGetTtl(b *testing.B) {
 	c := New()
 
 	keys := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 		c.Set(keys[i], fmt.Sprintf("value%d", i))
 	}
 
 	b.ResetTimer()
 
-	for i := range b.N {
+	for i := 0; i < b.N; i++ {
 		c.GetTtl(keys[i%keyPoolSize])
 	}
 }
@@ -610,14 +610,14 @@ func BenchmarkCacheChangeTtl(b *testing.B) {
 	c := New()
 
 	keys := make([]string, keyPoolSize)
-	for i := range keyPoolSize {
+	for i := 0; i < keyPoolSize; i++ {
 		keys[i] = strconv.Itoa(i)
 		c.Set(keys[i], fmt.Sprintf("value%d", i))
 	}
 
 	b.ResetTimer()
 
-	for i := range b.N {
+	for i := 0; i < b.N; i++ {
 		c.ChangeTtl(keys[i%keyPoolSize], 100*time.Millisecond)
 	}
 }
