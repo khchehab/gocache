@@ -1,5 +1,11 @@
 # gocache
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/khchehab/gocache.svg)](https://pkg.go.dev/github.com/khchehab/gocache)
+code coverage
+[![Go Report Card](https://goreportcard.com/badge/github.com/khchehab/gocache)](https://goreportcard.com/report/github.com/khchehab/gocache)
+release version
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 gocache is an in-memory cache in Go, it aims to provide a fast and efficient store to quickly read/write data.
 
 ## Installation
