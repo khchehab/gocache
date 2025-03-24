@@ -77,13 +77,3 @@ func main() {
 ## License
 
 This project is licensed under the [MIT license](LICENSE).
-
-## TODO
-
-- [ ] Add SyncCache for thread-safe caching.
-- [ ] Add a way to traverse the cache (to print or loop over), kind of like `_.foreach`.
-- [ ] Add badges to the repository under the repo name in README file.
-    - [ ] Code coverage.
-    - [ ] API documentation in go.dev.
-    - [ ] Some sort of sonar quality check or something if there is an equivalent for Go.
-    - [ ] See if there are some standard or good to have badges for Go projects.
