@@ -1,6 +1,3 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
 name: Go
 
 on:
@@ -10,40 +7,38 @@ on:
 jobs:
 
   test:
-    name: Test & Lint
+    name: Test on Go ${{matrix.go-version}}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: [ '1.18', '1.20', '1.24' ]
-
+        go-version: [ '1.18', '1.24' ]
     steps:
-    - name: Checkout the code
+    - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Set up Go ${{matrix.go-version}}
+    - name: Setup Go ${{matrix.go-version}}
       uses: actions/setup-go@v5
       with:
         go-version: ${{matrix.go-version}}
-
+        cache: true
     - name: Display Go version
       run: go version
-
     - name: Test
       run: GOMAXPROCS=1 go test -v ./...
-    
+  lint:
+    name: Lint (Latest Go)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup Go (Latest)
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache: true
     - name: Lint
       run: go vet ./...
-    
-    - name: Staticcheck (Go >= 1.22)
-      if: matrix.go-version >= '1.22'
+    - name: Staticcheck
       uses: dominikh/staticcheck-action@v1.3.1
       with:
         version: 2025.1.1
-        install-go: false
-    
-    - name: Staticcheck (Go < 1.22)
-      if: matrix.go-version < '1.22'
-      uses: dominikh/staticcheck-action@v1.3.1
-      with:
-        version: 2023.1.7
         install-go: false
