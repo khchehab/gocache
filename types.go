@@ -15,7 +15,7 @@ type cacheValue struct {
 	timer *time.Timer
 }
 
-// Expired returns a flag whether the cache entry has expired or not.
-func (v *cacheValue) Expired() bool {
+// expired returns a flag whether the cache entry has expired or not.
+func (v *cacheValue) expired() bool {
 	return v.ttl > 0 && v.expiryDate.Before(time.Now().UTC())
 }

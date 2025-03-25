@@ -96,7 +96,7 @@ func (c *Cache) Get(key string) (any, error) {
 		return nil, ErrKeyNotFound
 	}
 
-	if val.Expired() {
+	if val.expired() {
 		return nil, ErrKeyNotFound
 	}
 
@@ -113,7 +113,7 @@ func (c *Cache) GetAndDelete(key string) (any, error) {
 		return nil, ErrKeyNotFound
 	}
 
-	if val.Expired() {
+	if val.expired() {
 		return nil, ErrKeyNotFound
 	}
 
@@ -152,7 +152,7 @@ func (c *Cache) Delete(key string) int {
 func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
 	val, ok := c.data[key]
 
-	if !ok || val.Expired() {
+	if !ok || val.expired() {
 		return false
 	}
 
@@ -183,7 +183,7 @@ func (c *Cache) ChangeTtl(key string, ttl time.Duration) bool {
 func (c *Cache) GetTtl(key string) time.Duration {
 	val, ok := c.data[key]
 
-	if !ok || val.Expired() {
+	if !ok || val.expired() {
 		return -1
 	}
 
@@ -205,7 +205,7 @@ func (c *Cache) Keys() []string {
 func (c *Cache) Has(key string) bool {
 	val, ok := c.data[key]
 
-	if !ok || val.Expired() {
+	if !ok || val.expired() {
 		return false
 	}
 
