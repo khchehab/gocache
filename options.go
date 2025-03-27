@@ -34,3 +34,12 @@ func WithMaxKeys(maxKeys int) OptFunc {
 		}
 	}
 }
+
+// WithPartialSet returns an [OptFunc] that sets the cache's flag of partial set.
+// A value of `true` means if any key fails, it will not stop the function.
+// A value of `false` means if at least one key fails, the whole function will stop.
+func WithPartialSet(partialSet bool) OptFunc {
+	return func(c *Cache) {
+		c.partialSet = partialSet
+	}
+}

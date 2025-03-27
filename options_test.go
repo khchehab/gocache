@@ -36,6 +36,16 @@ var deleteOnExpireTestCases = []struct {
 	{"with delete on expire false", WithDeleteOnExpire(false), false},
 }
 
+var partialSetTestCases = []struct {
+	label    string
+	opt      OptFunc
+	expected bool
+}{
+	{"without opts", nil, true},
+	{"with partial set true", WithPartialSet(true), true},
+	{"with partial set false", WithPartialSet(false), false},
+}
+
 func TestMaxKeysOpts(t *testing.T) {
 	for _, tc := range maxKeysTestCases {
 		t.Run(tc.label, func(t *testing.T) {
@@ -82,6 +92,23 @@ func TestDeleteOnExpireOpts(t *testing.T) {
 
 			if c.deleteOnExpire != tc.expected {
 				t.Errorf("deleteOnExpire - got: %v, want: %v", c.deleteOnExpire, tc.expected)
+			}
+		})
+	}
+}
+
+func TestPartialSetOpts(t *testing.T) {
+	for _, tc := range partialSetTestCases {
+		t.Run(tc.label, func(t *testing.T) {
+			var c *Cache
+			if tc.opt != nil {
+				c = New(tc.opt)
+			} else {
+				c = New()
+			}
+
+			if c.partialSet != tc.expected {
+				t.Errorf("partialSet - got: %v, want: %v", c.partialSet, tc.expected)
 			}
 		})
 	}

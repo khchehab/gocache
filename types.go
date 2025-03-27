@@ -22,3 +22,15 @@ func (v *cacheValue) expired() bool {
 
 // EntryFunc is a function alias that takes in key and value parameters.
 type EntryFunc func(key string, value any)
+
+// CacheEntry is a struct containing a cache entry.
+// This structure is used for cache's multiple operations.
+type CacheEntry struct {
+	// Key is the key of the entry.
+	Key string
+	// Value is the value of the entry.
+	Value any
+	// Ttl is the time-to-live of the entry in duration.
+	// If Ttl is nil, it will follow the cache's global TTL.
+	Ttl *time.Duration
+}

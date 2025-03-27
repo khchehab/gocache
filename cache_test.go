@@ -182,6 +182,96 @@ func TestCacheGet(t *testing.T) {
 	})
 }
 
+func TestCacheGetMultiple(t *testing.T) {
+	// Setup
+	c := New()
+	c.Set("k1", "value1")
+	c.SetWithTtl("k2", "value2", 100*time.Millisecond)
+
+	// Test Case 1: Empty keys
+	t.Run("no keys", func(t *testing.T) {
+		values := c.GetMultiple()
+
+		if l := len(values); l != 0 {
+			t.Errorf("GetMultiple: values length - got: %d, want: 0", l)
+		}
+	})
+
+	// Test Case 2: All non-existing keys
+	t.Run("all non-existing keys", func(t *testing.T) {
+		values := c.GetMultiple("nokey1", "nokey2", "nokey3")
+
+		if l := len(values); l != 3 {
+			t.Errorf("GetMultiple: values length - got: %d, want: 3", l)
+		}
+
+		if v := values[0]; v != ErrKeyNotFound {
+			t.Errorf("GetMultiple: value nokey1 - got: %v, want ErrKeyNotFound", v)
+		}
+
+		if v := values[1]; v != ErrKeyNotFound {
+			t.Errorf("GetMultiple: value nokey2 - got: %v, want ErrKeyNotFound", v)
+		}
+
+		if v := values[2]; v != ErrKeyNotFound {
+			t.Errorf("GetMultiple: value nokey3 - got: %v, want ErrKeyNotFound", v)
+		}
+	})
+
+	// Test Case 3: All existing keys
+	t.Run("all existing keys", func(t *testing.T) {
+		values := c.GetMultiple("k1", "k2")
+
+		if l := len(values); l != 2 {
+			t.Errorf("GetMultiple: values length - got: %d, want: 2", l)
+		}
+
+		if v := values[0]; v != "value1" {
+			t.Errorf("GetMultiple: value k1 - got: %v, want value1", v)
+		}
+
+		if v := values[1]; v != "value2" {
+			t.Errorf("GetMultiple: value k2 - got: %v, want value2", v)
+		}
+	})
+
+	// Test Case 4: Mixed keys (existing and non-existing)
+	t.Run("mixed keys", func(t *testing.T) {
+		values := c.GetMultiple("k1", "nokey2")
+
+		if l := len(values); l != 2 {
+			t.Errorf("GetMultiple: values length - got: %d, want: 2", l)
+		}
+
+		if v := values[0]; v != "value1" {
+			t.Errorf("GetMultiple: value k1 - got: %v, want value1", v)
+		}
+
+		if v := values[1]; v != ErrKeyNotFound {
+			t.Errorf("GetMultiple: value k2 - got: %v, want ErrKeyNotFound", v)
+		}
+	})
+
+	// Test Case 5: All existing keys (after TTL expires)
+	t.Run("all existing keys after TTL expires", func(t *testing.T) {
+		time.Sleep(150 * time.Millisecond)
+
+		values := c.GetMultiple("k1", "k2")
+
+		if l := len(values); l != 2 {
+			t.Errorf("GetMultiple: values length - got: %d, want: 2", l)
+		}
+
+		if v := values[0]; v != "value1" {
+			t.Errorf("GetMultiple: value k1 - got: %v, want value1", v)
+		}
+
+		if v := values[1]; v != ErrKeyNotFound {
+			t.Errorf("GetMultiple: value k2 - got: %v, want ErrKeyNotFound", v)
+		}
+	})
+}
+
 func TestCacheGetAndDelete(t *testing.T) {
 	// Setup
 	c := New()
@@ -244,6 +334,99 @@ func TestCacheGetAndDelete(t *testing.T) {
 	})
 }
 
+func TestCacheGetAndDeleteMultiple(t *testing.T) {
+	// Setup
+	c := New()
+	c.Set("k1", "value1")
+	c.SetWithTtl("k2", "value2", 100*time.Millisecond)
+	c.Set("k3", "value3")
+	c.Set("k4", "value4")
+	c.Set("k5", "value5")
+
+	// Test Case 1: Empty keys
+	t.Run("no keys", func(t *testing.T) {
+		values := c.GetAndDeleteMultiple()
+
+		if l := len(values); l != 0 {
+			t.Errorf("GetAndDeleteMultiple: values length - got: %d, want: 0", l)
+		}
+	})
+
+	// Test Case 2: All non-existing keys
+	t.Run("all non-existing keys", func(t *testing.T) {
+		values := c.GetAndDeleteMultiple("nokey1", "nokey2", "nokey3")
+
+		if l := len(values); l != 3 {
+			t.Errorf("GetAndDeleteMultiple: values length - got: %d, want: 3", l)
+		}
+
+		if v := values[0]; v != ErrKeyNotFound {
+			t.Errorf("GetAndDeleteMultiple: value nokey1 - got: %v, want ErrKeyNotFound", v)
+		}
+
+		if v := values[1]; v != ErrKeyNotFound {
+			t.Errorf("GetAndDeleteMultiple: value nokey2 - got: %v, want ErrKeyNotFound", v)
+		}
+
+		if v := values[2]; v != ErrKeyNotFound {
+			t.Errorf("GetAndDeleteMultiple: value nokey3 - got: %v, want ErrKeyNotFound", v)
+		}
+	})
+
+	// Test Case 3: All existing keys
+	t.Run("all existing keys", func(t *testing.T) {
+		values := c.GetAndDeleteMultiple("k4", "k3")
+
+		if l := len(values); l != 2 {
+			t.Errorf("GetAndDeleteMultiple: values length - got: %d, want: 2", l)
+		}
+
+		if v := values[0]; v != "value4" {
+			t.Errorf("GetAndDeleteMultiple: value k4 - got: %v, want value4", v)
+		}
+
+		if v := values[1]; v != "value3" {
+			t.Errorf("GetAndDeleteMultiple: value k3 - got: %v, want value3", v)
+		}
+	})
+
+	// Test Case 4: Mixed keys (existing and non-existing)
+	t.Run("mixed keys", func(t *testing.T) {
+		values := c.GetAndDeleteMultiple("k5", "nokey2")
+
+		if l := len(values); l != 2 {
+			t.Errorf("GetAndDeleteMultiple: values length - got: %d, want: 2", l)
+		}
+
+		if v := values[0]; v != "value5" {
+			t.Errorf("GetAndDeleteMultiple: value k5 - got: %v, want value5", v)
+		}
+
+		if v := values[1]; v != ErrKeyNotFound {
+			t.Errorf("GetAndDeleteMultiple: value nokey2 - got: %v, want ErrKeyNotFound", v)
+		}
+	})
+
+	// Test Case 5: All existing keys (after TTL expires)
+	t.Run("all existing keys after TTL expires", func(t *testing.T) {
+		time.Sleep(150 * time.Millisecond)
+
+		values := c.GetAndDeleteMultiple("k1", "k2")
+
+		if l := len(values); l != 2 {
+			t.Errorf("GetAndDeleteMultiple: values length - got: %d, want: 2", l)
+		}
+
+		if v := values[0]; v != "value1" {
+			t.Errorf("GetAndDeleteMultiple: value k1 - got: %v, want value1", v)
+		}
+
+		if v := values[1]; v != ErrKeyNotFound {
+			t.Errorf("GetAndDeleteMultiple: value k2 - got: %v, want ErrKeyNotFound", v)
+		}
+	})
+}
+
 func TestCacheDelete(t *testing.T) {
 	// Setup
 	c := New()
@@ -255,7 +438,7 @@ func TestCacheDelete(t *testing.T) {
 		count := c.Delete("non1")
 
 		if count != 0 {
-			t.Errorf("deleted count - got: %d, want 0", count)
+			t.Errorf("Delete - got: %d, want 0", count)
 		}
 	})
 
@@ -264,7 +447,7 @@ func TestCacheDelete(t *testing.T) {
 		count := c.Delete("k1")
 
 		if count != 1 {
-			t.Errorf("deleted count - got: %d, want 1", count)
+			t.Errorf("Delete - got: %d, want 1", count)
 		}
 	})
 
@@ -273,7 +456,64 @@ func TestCacheDelete(t *testing.T) {
 		count := c.Delete("k2")
 
 		if count != 1 {
-			t.Errorf("deleted count - got: %d, want 1", count)
+			t.Errorf("Delete - got: %d, want 1", count)
+		}
+	})
+}
+
+func TestCacheDeleteMultiple(t *testing.T) {
+	// Setup
+	c := New()
+	c.Set("k1", "value1")
+	c.SetWithTtl("k2", "value2", 100*time.Millisecond)
+	c.Set("k3", "value3")
+	c.Set("k4", "value4")
+	c.Set("k5", "value5")
+
+	// Test Case 1: Empty keys
+	t.Run("no keys", func(t *testing.T) {
+		deletedCount := c.DeleteMultiple()
+
+		if deletedCount != 0 {
+			t.Errorf("DeleteMultiple - got: %d, want: 0", deletedCount)
+		}
+	})
+
+	// Test Case 2: Delete non-existing keys
+	t.Run("non-existing key", func(t *testing.T) {
+		count := c.DeleteMultiple("nokey1", "nokey2", "nokey3")
+
+		if count != 0 {
+			t.Errorf("DeleteMultiple - got: %d, want 0", count)
+		}
+	})
+
+	// Test Case 3: Delete mixed keys (existing and non-existing)
+	t.Run("mixed keys", func(t *testing.T) {
+		count := c.DeleteMultiple("k3", "nokey1")
+
+		if count != 1 {
+			t.Errorf("DeleteMultiple - got: %d, want 1", count)
+		}
+	})
+
+	// Test Case 4: Delete existing keys
+	t.Run("existing keys", func(t *testing.T) {
+		count := c.DeleteMultiple("k4", "k5")
+
+		if count != 2 {
+			t.Errorf("DeleteMultiple - got: %d, want 2", count)
+		}
+	})
+
+	// Test Case 5: Delete existing key after TTL
+	t.Run("existing key after TTL expires", func(t *testing.T) {
+		time.Sleep(150 * time.Millisecond)
+
+		count := c.DeleteMultiple("k1", "k2")
+
+		if count != 1 {
+			t.Errorf("DeleteMultiple - got: %d, want 1", count)
 		}
 	})
 }

@@ -20,6 +20,8 @@ type Cache struct {
 	// If the cache exceeds this limit, an error will be thrown.
 	// The value `-1` means unlimited.
 	maxKeys int
+	// partialSet defines whether the [SetMultiple] function should do a partial set if an error occurs.
+	partialSet bool
 
 	data map[string]*cacheValue
 }
@@ -30,6 +32,7 @@ func New(opts ...OptFunc) *Cache {
 		stdTtl:         0,
 		deleteOnExpire: true,
 		maxKeys:        -1,
+		partialSet:     true,
 		data:           make(map[string]*cacheValue),
 	}
 
@@ -86,6 +89,13 @@ func (c *Cache) SetWithTtl(key string, value any, ttl time.Duration) error {
 	return nil
 }
 
+// func (c *Cache) SetMultiple(entries ...CacheEntry) error {
+// 	if len(entries) == 0 {
+// 		return nil
+// 	}
+
+// }
+
 // Get returns the value associated with the provided key from the cache.
 // It returns the value if found in the cache.
 // If an error occurs, it will be returned, otherwise nil will be returned.
@@ -101,6 +111,26 @@ func (c *Cache) Get(key string) (any, error) {
 	}
 
 	return val.value, nil
+}
+
+// GetMultiple returns multiple values based on the keys provided.
+// The function returns a slice of any, where each index corresponds to the result of calling [Get] on the index's key.
+func (c *Cache) GetMultiple(keys ...string) []any {
+	values := make([]any, 0, len(keys))
+	if len(keys) == 0 {
+		return values
+	}
+
+	for _, key := range keys {
+		value, err := c.Get(key)
+		if err != nil {
+			values = append(values, err)
+		} else {
+			values = append(values, value)
+		}
+	}
+
+	return values
 }
 
 // GetAndDelete returns the value associated with the provided key from the cache and removes it.
@@ -126,11 +156,29 @@ func (c *Cache) GetAndDelete(key string) (any, error) {
 	return val.value, nil
 }
 
+// GetAndDeleteMultiple returns multiple values based on the keys provided.
+// The function returns a slice of any, where each index corresponds to the result of calling [Get] on the index's key.
+func (c *Cache) GetAndDeleteMultiple(keys ...string) []any {
+	values := make([]any, 0, len(keys))
+	if len(keys) == 0 {
+		return values
+	}
+
+	for _, key := range keys {
+		value, err := c.GetAndDelete(key)
+		if err != nil {
+			values = append(values, err)
+		} else {
+			values = append(values, value)
+		}
+	}
+
+	return values
+}
+
 // Delete removes the entry associated with the provided key from the cache if it exists.
 // It returns the number of deleted items from the cache.
 func (c *Cache) Delete(key string) int {
-	count := 0
-
 	val, ok := c.data[key]
 
 	if !ok {
@@ -142,9 +190,23 @@ func (c *Cache) Delete(key string) int {
 	}
 
 	delete(c.data, key)
-	count++
+	return 1
+}
+
+// DeleteMultiple deletes multiple entries from the cache and returns the total number of entries deleted.
+func (c *Cache) DeleteMultiple(keys ...string) int {
+	if len(keys) == 0 {
+		return 0
+	}
+
+	count := 0
+
+	for _, key := range keys {
+		count += c.Delete(key)
+	}
 
 	return count
+
 }
 
 // ChangeTtl changes the TTL associated with the provided key in the cache.
