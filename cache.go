@@ -226,3 +226,19 @@ func (c *Cache) Clear() {
 
 	c.data = make(map[string]*cacheValue)
 }
+
+// Len returns the length of the cache.
+func (c *Cache) Len() int {
+	return len(c.data)
+}
+
+// ForEach loops over the entries and calls the passed in [EntryFunc] on each entry.
+func (c *Cache) ForEach(fn EntryFunc) {
+	if len(c.data) == 0 {
+		return
+	}
+
+	for key, val := range c.data {
+		fn(key, val.value)
+	}
+}

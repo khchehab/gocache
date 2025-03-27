@@ -19,3 +19,6 @@ type cacheValue struct {
 func (v *cacheValue) expired() bool {
 	return v.ttl > 0 && v.expiryDate.Before(time.Now().UTC())
 }
+
+// EntryFunc is a function alias that takes in key and value parameters.
+type EntryFunc func(key string, value any)

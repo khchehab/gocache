@@ -334,17 +334,27 @@ func TestCacheClear(t *testing.T) {
 	c.SetWithTtl("k2", "value2", 500*time.Millisecond)
 	c.Get("k2")
 
-	t.Run("clear cache", func(t *testing.T) {
-		c.Clear()
+	// Clear cache with existing entries
+	c.Clear()
 
-		if c.Has("k1") {
-			t.Error("Has \"k1\" - got: true, want: false")
-		}
+	if c.Has("k1") {
+		t.Error("Has \"k1\" - got: true, want: false")
+	}
 
-		if c.Has("k2") {
-			t.Error("Has \"k2\" - got: true, want: false")
-		}
-	})
+	if c.Has("k2") {
+		t.Error("Has \"k2\" - got: true, want: false")
+	}
+
+	// Clear cache after being cleared
+	c.Clear()
+
+	if c.Has("k1") {
+		t.Error("Has \"k1\" - got: true, want: false")
+	}
+
+	if c.Has("k2") {
+		t.Error("Has \"k2\" - got: true, want: false")
+	}
 }
 
 func TestCacheGetTtl(t *testing.T) {
@@ -450,6 +460,108 @@ func TestCacheChangeTtl(t *testing.T) {
 			t.Errorf("ChangeTtl of \"nonexistent\" to 200ms - got: true, want: false")
 		}
 	})
+}
+
+func TestCacheLen(t *testing.T) {
+	// Setup
+	c := New()
+
+	// Length after initialization is 0
+	if l := c.Len(); l != 0 {
+		t.Errorf("Len - got: %d, want: 0", l)
+	}
+
+	c.Set("k1", "value1")
+
+	// Length after setting one entry is 1
+	if l := c.Len(); l != 1 {
+		t.Errorf("Len - got: %d, want: 1", l)
+	}
+
+	c.Set("k2", "value2")
+	c.SetWithTtl("k3", "value3", 200*time.Millisecond)
+
+	// Length after setting two more entries is 3
+	if l := c.Len(); l != 3 {
+		t.Errorf("Len - got: %d, want: 3", l)
+	}
+
+	time.Sleep(250 * time.Millisecond)
+
+	// Length after the third entry's TTL has passed is 2
+	if l := c.Len(); l != 2 {
+		t.Errorf("Len - got: %d, want: 2", l)
+	}
+}
+
+func TestCacheForEach(t *testing.T) {
+	// Setup
+	c := New()
+
+	visited := make(map[string]bool)
+
+	// ForEach on empty cache will do nothing
+	c.ForEach(func(key string, value any) {
+		_, ok := value.(string)
+		visited[key] = ok
+	})
+
+	if l := len(visited); l != 0 {
+		t.Errorf("ForEach - visisted length - got: %d, want: 0", l)
+	}
+
+	// ForEach on entries and create a map of visited keys and a value of whether the key is string or not.
+	c.Set("k1", "value1")
+	c.Set("k2", true)
+	c.SetWithTtl("k3", 2, 200*time.Millisecond)
+
+	visited = make(map[string]bool)
+
+	c.ForEach(func(key string, value any) {
+		_, ok := value.(string)
+		visited[key] = ok
+	})
+
+	if l := len(visited); l != 3 {
+		t.Errorf("ForEach - visisted length - got: %d, want: 3", l)
+	}
+
+	if value := visited["k1"]; !value {
+		t.Errorf("ForEach - k1 - got: %v, want: true", value)
+	}
+
+	if value := visited["k2"]; value {
+		t.Errorf("ForEach - k2 - got: %v, want: false", value)
+	}
+
+	if value := visited["k3"]; value {
+		t.Errorf("ForEach - k3 - got: %v, want: false", value)
+	}
+
+	time.Sleep(250 * time.Millisecond)
+
+	// clear the map
+	for k := range visited {
+		delete(visited, k)
+	}
+
+	// ForEach on entries and create a map of visited keys and a value of whether the key is string or not after the TTL has passed.
+	c.ForEach(func(key string, value any) {
+		_, ok := value.(string)
+		visited[key] = ok
+	})
+
+	if l := len(visited); l != 2 {
+		t.Errorf("ForEach - visisted length - got: %d, want: 2", l)
+	}
+
+	if value := visited["k1"]; !value {
+		t.Errorf("ForEach - k1 - got: %v, want: true", value)
+	}
+
+	if value := visited["k2"]; value {
+		t.Errorf("ForEach - k2 - got: %v, want: false", value)
+	}
 }
 
 func BenchmarkCacheSet(b *testing.B) {

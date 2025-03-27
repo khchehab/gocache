@@ -85,7 +85,7 @@ func main() {
 Below are some functionalities that I plan to add:
 - [ ] Add SyncCache for a concurrent-safe caching.
 - [ ] Add `Multiple*` function for operations that deal with multiple entries at the same time.
-- [ ] Add a `ForEach` function that loops over the entries and calls a function on each entry.
+- [x] Add a `ForEach` function that loops over the entries and calls a function on each entry.
 
 ## License
 
